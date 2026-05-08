@@ -88,8 +88,6 @@ int main()
 		} while (TotalRecvBytes < WantRecvBytes);
 
 		printf("%s=%s\n", Message, Buffer);
-
-		//RecvBytes = recv(ServerSocket, Buffer, WantRecvBytes, MSG_WAITALL);
 	}
 
 	shutdown(ServerSocket, SD_BOTH);

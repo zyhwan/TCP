@@ -11,6 +11,22 @@ const char Operators[5] = { '+', '-', '*', '/', '%' };
 
 int main()
 {
+
+	//host byte order(빅인지 리틀인지 모른다. 각 호스트마다 컴퓨터가 다르기 때문에 다르다.)
+	int Data = 0x12345678;
+
+	//network byte order(big endian)
+	printf("%x\n", Data);
+	printf("%x\n", ntohl(htonl(Data)));
+}
+
+//size code data
+//[][] [][] [][][][]...
+
+
+
+int main2()
+{
 	WSAData wsaData;
 	WSAStartup(MAKEWORD(2, 2), &wsaData);
 
@@ -115,20 +131,14 @@ int main()
 				}
 				TotalSentBytes += SentBytes;
 			} while (TotalSentBytes < WantSendBytes);
-		}
 
+			Sleep(100);
+		}
 		printf("send complete");
 		shutdown(ClientSocket, SD_BOTH);
 		closesocket(ClientSocket);
 	}
-
-
-
 	closesocket(ListenSocket);
-
-
-
 	WSACleanup();
-
 	return 0;
 }
