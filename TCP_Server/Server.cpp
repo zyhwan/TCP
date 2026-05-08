@@ -1,7 +1,8 @@
-#include <iostream>
+癤�#include <iostream>
 #include <string>
 #include <WinSock2.h>
 #include <WS2tcpip.h>
+#include "Packet.h"
 
 #pragma comment(lib, "ws2_32")
 
@@ -9,23 +10,23 @@
 
 const char Operators[5] = { '+', '-', '*', '/', '%' };
 
-int main()
-{
 
-	//host byte order(빅인지 리틀인지 모른다. 각 호스트마다 컴퓨터가 다르기 때문에 다르다.)
-	int Data = 0x12345678;
-
-	//network byte order(big endian)
-	printf("%x\n", Data);
-	printf("%x\n", ntohl(htonl(Data)));
-}
+//int main()
+//{
+//	//host byte order(little, big)
+//	int Data = 0x12345678;
+//
+//	//network byte order(big endian)
+//	printf("%x\n", Data);
+//	printf("%x\n", htonl(Data));
+//	printf("%x\n", ntohl( htonl(Data)));
+//}
 
 //size code data
-//[][] [][] [][][][]...
+//[][] [][] [][][][][][]..
 
 
-
-int main2()
+int main()
 {
 	WSAData wsaData;
 	WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -54,71 +55,60 @@ int main2()
 		SOCKET ClientSocket = accept(ListenSocket, (SOCKADDR*)&ClientSockAddr, &ClientSockAddrLength);
 		while (true)
 		{
-			char Buffer[1024] = { 0, };
-			int WantSendBytes = TotalPacketSize;
-
-			//recv
-			int RecvBytes = recv(ClientSocket, Buffer, WantSendBytes, MSG_WAITALL);
-
-			if (RecvBytes <= 0)
+			PacketHeader Header;
+			//header
+			int RecvBAytes = recv(ClientSocket, (char*)&Header, sizeof(Header), MSG_WAITALL);
+			if (RecvBAytes <= 0)
 			{
 				break;
 			}
-			//process
-			std::string Packet(Buffer);
 
-			int OperatorPosition = 0;
-			char Operator = 0;
-			for (const auto& CheckOperator : Operators)
+			Header.Size = ntohs(Header.Size);
+			Header.Code = ntohs(Header.Code);
+
+			long long Result = 0;
+
+			//[][][][] [][][][]
+			TwoNumber Data;
+			recv(ClientSocket, (char*)&Data, Header.Size, MSG_WAITALL);
+			Data.First = ntohl(Data.First);
+			Data.Second = ntohl(Data.Second);
+
+			switch (static_cast<PacketType>(Header.Code))
 			{
-				OperatorPosition = static_cast<int>(Packet.find(CheckOperator));
-				Operator = CheckOperator;
-				if (OperatorPosition != std::string::npos)
-				{
-					break;
-				}
-			}
-
-			std::string FirstStringNumber = Packet.substr(0, OperatorPosition);
-			std::string SecondStringNumber = Packet.substr(OperatorPosition + 1, Packet.length() - OperatorPosition);
-
-			int FirstNumber = std::stoi(FirstStringNumber);
-			int SecondNumber = std::stoi(SecondStringNumber);
-
-			int Result = 0;
-
-			switch (Operator)
-			{
-			case '+':
-				Result = FirstNumber + SecondNumber;
+			case PacketType::Plus:
+				Result = Data.First + Data.Second;
 				break;
-			case '-':
-				Result = FirstNumber - SecondNumber;
+			case PacketType::Minus:
+				Result = Data.First - Data.Second;
 				break;
-			case '/':
-				Result = FirstNumber / SecondNumber;
+			case PacketType::Divide:
+				Result = Data.First / Data.Second;
 				break;
-			case '*':
-				Result = FirstNumber * SecondNumber;
+			case PacketType::Multiply:
+				Result = Data.First * Data.Second;
 				break;
-			case '%':
-				Result = FirstNumber % SecondNumber;
+			case PacketType::Remainder:
+				Result = Data.First % Data.Second;
 				break;
 			}
 
-			printf("%d%c%d=%d\n", FirstNumber, Operator, SecondNumber, Result);
 
-			//send
+			printf("%d%c%d=%lld\n", Data.First, Operators[Header.Code], Data.Second, Result);
+
+			PacketHeader SendPacketHeader;
+			SendPacketHeader.Size = sizeof(Result);
+			SendPacketHeader.Code = static_cast<unsigned short>(PacketType::Result);
+
+			SendPacketHeader.Size = htons(SendPacketHeader.Size);
+			SendPacketHeader.Code = htons(SendPacketHeader.Code);
+
+			int WantSendBytes = sizeof(SendPacketHeader);
 			int SentBytes = 0;
 			int TotalSentBytes = 0;
-
-			char Message[1024] = { 0, };
-
-			sprintf_s(Message, "%d", Result);
-
 			do
 			{
-				SentBytes = send(ClientSocket, &Message[TotalSentBytes], WantSendBytes - TotalSentBytes, 0);
+				SentBytes = send(ClientSocket, (char*)(&SendPacketHeader) + TotalSentBytes, WantSendBytes - TotalSentBytes, 0);
 				if (SentBytes == 0)
 				{
 					printf("connection close");
@@ -132,13 +122,42 @@ int main2()
 				TotalSentBytes += SentBytes;
 			} while (TotalSentBytes < WantSendBytes);
 
-			Sleep(100);
+
+			//Data
+			//[][][][] [][][][]
+			Result = htonll(Result);
+
+			WantSendBytes = sizeof(Result);
+			SentBytes = 0;
+			TotalSentBytes = 0;
+			do
+			{
+				SentBytes = send(ClientSocket, (char*)(&Result) + TotalSentBytes, WantSendBytes - TotalSentBytes, 0);
+				if (SentBytes == 0)
+				{
+					printf("connection close");
+					exit(-1);
+				}
+				else if (SentBytes < 0)
+				{
+					printf("send error");
+					exit(-1);
+				}
+				TotalSentBytes += SentBytes;
+			} while (TotalSentBytes < WantSendBytes);
 		}
-		printf("send complete");
+
 		shutdown(ClientSocket, SD_BOTH);
 		closesocket(ClientSocket);
 	}
+
+
+
 	closesocket(ListenSocket);
+
+
+
 	WSACleanup();
+
 	return 0;
 }
