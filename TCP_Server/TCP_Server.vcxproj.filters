@@ -18,6 +18,9 @@
     <ClCompile Include="Server.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
+    <ClCompile Include="Test.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Packet.h">
